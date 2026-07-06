@@ -1,0 +1,20 @@
+parameters:
+    level: 6
+    phpVersion: 80200
+
+    # Dein Modulverzeichnis analysieren
+    paths:
+        - ./
+
+    # Stubs mit IPS-Funktionen
+    scanDirectories:
+        - %env.IPS_STUBS_PATH%
+
+    excludePaths:
+        analyse:
+            - %env.IPS_STUBS_PATH%/*
+
+    ignoreErrors:
+
+    # Supress ignore Errors
+    reportUnmatchedIgnoredErrors: false

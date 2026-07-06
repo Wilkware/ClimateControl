@@ -1,0 +1,12 @@
+{
+    "id": "{C5A6F70D-C988-61A9-29F6-9C33A5A8D95C}",
+    "name": "ClimateControl",
+    "author": "Wilkware (@Pitti)",
+    "url": "https://wilkware.de",
+    "compatibility": {
+        "version": "8.1"
+    },
+    "version": "1.0",
+    "build": 20260706,
+    "date": 1783339200
+}

@@ -1,0 +1,37 @@
+{
+    "translations": {
+        "de": {
+            "Clima Control": "Klimaregler",
+            "Module for visual control and automation of heating, cooling and air conditioning systems.": "Modul zur visuellen Steuerung und Automatisierung von Heizungs-, Kühlsystemen und Klimaanlagen.",
+            "🌡️ Climate data ...": "🌡️ Klimadaten ...",
+            "Actual Temperature:": "Ist-Temperatur:",
+            "Target Temperature:": "Soll-Temperatur:",
+            "Valve Level (optional):": "Ventilstellung (optional):",
+            "Humidity (optional):": "Luftfeuchte (optional):",
+            "Left / Right status icon (leave variable empty to hide):": "Status-Icon links / rechts (Variable leer lassen zum Ausblenden):",
+            "Variable": "Variable",
+            "Name": "Name",
+            "Ident": "Ident",
+            "Icon": "Icon",
+            "Color": "Farbe",
+            "Active mode (variable holding the current mode ident):": "Aktiver Modus (Variable mit dem aktuellen Modus-Identifikator):",
+            "ANALYZE VARIABLE": "VARIABLE ANALYSIEREN",
+            "CLEAR LIST": "LISTE LEEREN",
+            "YES": "JA",
+            "NO": "NEIN",
+            "Do you really want to delete the list?": "Möchten Sie wirkliche die Liste löschen?",
+            "Please select a variable first.": "Bitte zuerst eine Variable auswählen.",
+            "Selected variable has neither a presentation nor a profile with associations.": "Die ausgewählte Variable hat weder eine Präsentation noch ein Profil mit Zuordnungen.",
+            "Available modes:": "Verfügbare Modi:",
+            "✨ Visualisation ...": "✨ Visualisierung ...",
+            "Color (COLD):": "Farbe (KALT):",
+            "Color (WARM):": "Farbe (WARM):",
+            "Show status labels?": "Status-Beschriftungen anzeigen?",
+            "Show mode labels?": "Modus-Beschriftungen anzeigen?",
+            "⚙️ Advanced settings ...": "⚙️ Erweiterte Einstellungen ...",
+            "Transfer control activities to a script:": "Steuerungsaktivitäten an Script übergeben:",
+            "🎗️ Source code, donation and licence ...": "🎗️ Quellcode, Spende und Lizenz ...",
+            "The software is free of charge for non-commercial use, I would appreciate a donation if you like the module.": "Die Software ist für die nicht kommerzielle Nutzung kostenlos, über eine Spende bei Gefallen des Moduls würde ich mich sehr freuen."
+        }
+    }
+}
