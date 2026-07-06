@@ -1,7 +1,7 @@
 {
     "translations": {
         "de": {
-            "Clima Control": "Klimaregler",
+            "Climate Control": "Klimaregler",
             "Module for visual control and automation of heating, cooling and air conditioning systems.": "Modul zur visuellen Steuerung und Automatisierung von Heizungs-, Kühlsystemen und Klimaanlagen.",
             "🌡️ Climate data ...": "🌡️ Klimadaten ...",
             "Actual Temperature:": "Ist-Temperatur:",
