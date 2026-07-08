@@ -60,6 +60,7 @@
                             "name": "valveLevel",
                             "caption": "Valve Level:",
                             "validVariableTypes": [
+                                0,
                                 1,
                                 2
                             ],

@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/Symcon-PHP--Modul-red.svg?style=flat-square)](https://www.symcon.de/service/dokumentation/entwicklerbereich/sdk-tools/sdk-php/)
 [![Product](https://img.shields.io/badge/Symcon%20Version-8.1-blue.svg?style=flat-square)](https://www.symcon.de/produkt/)
-[![Version](https://img.shields.io/badge/Modul%20Version-1.0.20260706-orange.svg?style=flat-square)](https://github.com/Wilkware/ClimateControl)
+[![Version](https://img.shields.io/badge/Modul%20Version-1.1.20260708-orange.svg?style=flat-square)](https://github.com/Wilkware/ClimateControl)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-green.svg?style=flat-square)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![Actions](https://img.shields.io/github/actions/workflow/status/wilkware/ClimateControl/ci.yml?branch=main&label=CI&style=flat-square)](https://github.com/Wilkware/ClimateControl/actions)
 
@@ -105,6 +105,13 @@ Man kann gesamte Modul (HTML-SDK Support) direkt in der Visualisierung verlinken
 Das Modul stellt keine direkten Funktionsaufrufe zur Verfügung.
 
 ### 8. Versionshistorie
+
+v1.1.20260708
+
+* _NEU_: Ventilstellung erlaubt auch boolsche Variable (false = 0%, true = 100%)
+* _FIX_: Modusliste kann jetzt auch mit benutzerdefinierten Darstellungen umgehen
+* _FIX_: Ration zwischen Quer- und Hochformat angepasst, Buttons erscheinen jetzt etwas später
+* _FIX_: Kit-Icons (fak) werden jetzt auch korrekt angezeigt
 
 v1.0.20260706
 

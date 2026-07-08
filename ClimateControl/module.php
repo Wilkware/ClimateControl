@@ -206,8 +206,16 @@ class ClimateControl extends IPSModuleStrict
             $this->SendDebug(__FUNCTION__, "Update of $sender = $data[0]", 0);
             foreach (self::REG_VARIABLES as $property) {
                 if ($this->ReadPropertyInteger($property) === $sender) {
+                    $value = $data[0];
+
+                    // Boolean valve drive: treat as a 0%/100% edge case of the
+                    // standard 0–100% scale rather than as true/false
+                    if ($property === 'valveLevel' && is_bool($value)) {
+                        $value = $value ? 100.0 : 0.0;
+                    }
+
                     $this->UpdateVisualizationValue(json_encode([
-                        $property => $data[0],
+                        $property => $value,
                     ]));
                     $found = true;
                     break;
@@ -228,7 +236,6 @@ class ClimateControl extends IPSModuleStrict
             }
         }
     }
-
     /**
      * Is called when, for example, a button is clicked in the visualization.
      *
@@ -300,6 +307,41 @@ class ClimateControl extends IPSModuleStrict
         }
 
         $this->UpdateFormField('modeData', 'values', json_encode([]));
+    }
+
+    /**
+     * Get variable value or null
+     *
+     * @param string $property Property name
+     */
+    private function GetValueOrNull(string $property): mixed
+    {
+        $variable = $this->ReadPropertyInteger($property);
+        return ($variable >= self::IPS_MIN_ID && IPS_VariableExists($variable)) ? GetValue($variable) : null;
+    }
+
+    /**
+     * Resolve valve level
+     *
+     * @param int $id Variable ID
+     *
+     * @return float|null
+     */
+    private function ResolveValveLevel(int $id): ?float
+    {
+        if ($id < self::IPS_MIN_ID || !IPS_VariableExists($id)) {
+            return null;
+        }
+
+        $variable = IPS_GetVariable($id);
+        $value = GetValue($id);
+
+        if ($variable['VariableType'] === VARIABLETYPE_BOOLEAN) {
+            // Simple On/Off-Switch, return 100% or 0%
+            return $value ? 100.0 : 0.0;
+        }
+
+        return (float) $value;
     }
 
     /**
@@ -378,6 +420,12 @@ class ClimateControl extends IPSModuleStrict
 
         if (empty($presentation)) {
             return null;
+        }
+
+        // Check only PRESENTATION or PRESENTATION + TEMPLATE
+        $keys = array_keys($presentation);
+        if (in_array('PRESENTATION', $keys, true) && count(array_diff($keys, ['PRESENTATION', 'TEMPLATE'])) === 0) {
+            $presentation = IPS_GetVariablePresentation($id);
         }
 
         $rows = [];
@@ -584,12 +632,12 @@ class ClimateControl extends IPSModuleStrict
         $result = [];
         $result['colorCold'] = $this->GetColorFormatted($this->ReadPropertyInteger('colorCold'));
         $result['colorWarm'] = $this->GetColorFormatted($this->ReadPropertyInteger('colorWarm'));
-        $result['tempActual'] = IPS_VariableExists($this->ReadPropertyInteger('tempActual')) ? GetValue($this->ReadPropertyInteger('tempActual')) : null;
-        $result['tempTarget'] = IPS_VariableExists($this->ReadPropertyInteger('tempTarget')) ? GetValue($this->ReadPropertyInteger('tempTarget')) : null;
-        $result['valveLevel'] = IPS_VariableExists($this->ReadPropertyInteger('valveLevel')) ? GetValue($this->ReadPropertyInteger('valveLevel')) : null;
-        $result['relativeHumidity'] = IPS_VariableExists($this->ReadPropertyInteger('relativeHumidity')) ? GetValue($this->ReadPropertyInteger('relativeHumidity')) : null;
+        $result['tempActual'] = $this->GetValueOrNull('tempActual');
+        $result['tempTarget'] = $this->GetValueOrNull('tempTarget');
+        $result['valveLevel'] = $this->ResolveValveLevel($this->ReadPropertyInteger('valveLevel'));
+        $result['relativeHumidity'] = $this->GetValueOrNull('relativeHumidity');
         $result['statusData'] = $statusData;
-        $result['modeActive'] = IPS_VariableExists($this->ReadPropertyInteger('modeActive')) ? GetValue($this->ReadPropertyInteger('modeActive')) : null;
+        $result['modeActive'] = $this->GetValueOrNull('modeActive');
         $result['modeData'] = $modeData;
         $result['statusLabels'] = $this->ReadPropertyBoolean('statusLabels');
         $result['modeLabels'] = $this->ReadPropertyBoolean('modeLabels');
