@@ -8,6 +8,8 @@
 
 Visuelle Steuerung von Heizung, Kühlung und Klimaanlagen über ein interaktives, vollständig skalierbares HTML-SDK-Widget.
 
+![Module-Visu](imgs/climate-control.png) 
+
 ## Inhaltsverzeichnis
 
 1. [Funktionsumfang](#user-content-1-funktionsumfang)
