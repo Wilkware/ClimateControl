@@ -5,6 +5,12 @@ declare(strict_types=1);
 /** Generell funktions */
 require_once __DIR__ . '/../libs/_traits.php';
 
+/** Namespaced traits */
+use Wilkware\ClimateControl\DebugHelper;
+use Wilkware\ClimateControl\FormatHelper;
+use Wilkware\ClimateControl\VariableHelper;
+use Wilkware\ClimateControl\VersionHelper;
+
 /**
  * Class ClimateControl
  */
@@ -236,6 +242,7 @@ class ClimateControl extends IPSModuleStrict
             }
         }
     }
+
     /**
      * Is called when, for example, a button is clicked in the visualization.
      *
@@ -606,6 +613,7 @@ class ClimateControl extends IPSModuleStrict
             IPS_RunScriptEx($script, $params);
         }
     }
+
     /**
      * Generate a message that updates all elements in the HTML display.
      *

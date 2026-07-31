@@ -14,6 +14,10 @@
 
 declare(strict_types=1);
 
+/** @symcon-namespace */
+
+namespace Wilkware\ClimateControl;
+
 /**
  * Helper class for extract verion infos.
  */
