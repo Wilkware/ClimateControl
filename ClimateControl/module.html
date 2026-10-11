@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 
 <head>
     <title>ClimateControl</title>
@@ -86,7 +86,7 @@
             width: 100%;
         }
 
-        /* ── Grid: tall or squareh ───────────────────────────────────────── */
+        /* ── Grid: tall or square ───────────────────────────────────────── */
         @container (max-aspect-ratio: 1.30) {
             .grid {
                 grid-template-columns: 1fr;
@@ -133,6 +133,27 @@
 
         .cc-button:active {
             background: color-mix(in srgb, var(--content-color) 15%, transparent);
+        }
+
+        /* ── Read-only: linked variable without action and no action script */
+        .temp-readonly .cc-button {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+
+        .temp-readonly #dot-group,
+        .temp-readonly #arc-hitzone {
+            pointer-events: none;
+        }
+
+        .cc-gauge-status-button.readonly,
+        .cc-mode-row.readonly .cc-mode-button {
+            cursor: default;
+        }
+
+        .cc-gauge-status-button.readonly:hover,
+        .cc-mode-row.readonly .cc-mode-button:hover {
+            background: transparent;
         }
 
         #button-minus {
@@ -399,7 +420,7 @@
                                 </div>
                                 <div class="cc-gauge-temp-actual">
                                     <i class="fa-light fa-thermometer-empty"></i>
-                                    <span id="ist-display">15.2</span>°C
+                                    <span id="ist-display">--</span>°C
                                 </div>
                                 <div class="cc-gauge-humidity" id="humidity-row" style="display:none">
                                     <i class="fa-light fa-droplet"></i>
@@ -407,7 +428,7 @@
                                 </div>
                             </div>
                             <div class="cc-gauge-temp-target">
-                                <span id="soll-display">18.0</span><span class="cc-gauge-temp-unit">°C</span>
+                                <span id="soll-display">--</span><span class="cc-gauge-temp-unit">°C</span>
                             </div>
                         </div>
                     </div>
@@ -440,30 +461,23 @@
         }
 
         // ── STATE: ───────────────────────────────────────────────────────────
-        const TEMP_MIN = 4.5, TEMP_MAX = 30.5;
         const cs = getComputedStyle(root);
+        let tempMin = 4.5, tempMax = 30.5;
         let colorCold = cs.getPropertyValue('--color-cold').trim() || '#11A0F3';
         let colorWarm = cs.getPropertyValue('--color-warm').trim() || '#F35A2C';
-        let tempTarget = 18.0;
-        let tempActual = 15.0;
+        let tempTarget = null;
+        let tempTargetControl = true;
+        let tempActual = null;
         let relativeHumidity = null;
         let valveLevel = null;
         let statusLeft = false;
         let statusRight = false;
         let statusLabels = false;
-        let statusData = [
-            { variable: 0, name: 'Fenster', value: false, icon: 'window-frame-open', color: '#5ba8e8' },
-            { variable: 0, name: 'Prognose', value: false, icon: 'sun', color: '#e8b44a' }
-        ];
+        let statusData = [];
         let modeLabels = false;
-        let modeActive = 'program';
-        let modeData = [
-            { value: 'vacation', name: 'Urlaub', icon: 'suitcase-rolling', color: '#5ba8e8' },
-            { value: 'program', name: 'Programm', icon: 'calendar-clock', color: '#6dd68a' },
-            { value: 'manual', name: 'Manuell', icon: 'hand-back-point-up', color: '#e8c44a' },
-            { value: 'pause', name: 'Pause', icon: 'pause', color: '#e89a4a' },
-            { value: 'off', name: 'Aus', icon: 'power-off', color: '#e86a6a' }
-        ];
+        let modeControl = true;
+        let modeActive = null;
+        let modeData = [];
 
         // ── GAUGE : arc geometry (viewBox 240×240, r=100) 150° → 240° clockwise
         const CX = 120, CY = 120, R = 100;
@@ -481,8 +495,8 @@
             const a = polarXY(s), b = polarXY(s + span);
             return `M ${a.x.toFixed(2)} ${a.y.toFixed(2)} A ${R} ${R} 0 ${span > 180 ? 1 : 0} 1 ${b.x.toFixed(2)} ${b.y.toFixed(2)}`;
         }
-        const tempToT = t => (Math.max(TEMP_MIN, Math.min(TEMP_MAX, t)) - TEMP_MIN) / (TEMP_MAX - TEMP_MIN);
-        const tToTemp = t => TEMP_MIN + t * (TEMP_MAX - TEMP_MIN);
+        const tempToT = t => (Math.max(tempMin, Math.min(tempMax, t)) - tempMin) / (tempMax - tempMin);
+        const tToTemp = t => tempMin + t * (tempMax - tempMin);
 
         // ── ICON: FontAwesome icon mapping ──────────────────────────────────
         function getIconType(iconName) {
@@ -555,6 +569,8 @@
             document.getElementById('soll-display').textContent = hasTarget ? tempTarget.toFixed(1) : '--';
             document.getElementById('ist-display').textContent = hasActual ? parseFloat(tempActual).toFixed(1) : '--';
 
+            document.getElementById('content').classList.toggle('temp-readonly', !tempTargetControl || !hasTarget);
+
             const hasHumidity = relativeHumidity !== null && relativeHumidity !== '' && !isNaN(relativeHumidity);
             document.getElementById('humidity-row').style.display = hasHumidity ? '' : 'none';
             if (hasHumidity) {
@@ -568,18 +584,31 @@
             }
         }
 
+        // ── BUILD: icon + label (textContent, as names are free text) ────────
+        function appendIconAndLabel(btn, item, labelClass) {
+            const icon = document.createElement('i');
+            icon.className = getIconType(item.icon).classes;
+            const label = document.createElement('span');
+            label.className = labelClass;
+            label.textContent = item.name ?? '';
+            btn.append(icon, label);
+        }
+
         // ── BUILD: status buttons (left/right slots) from statusData ──────────
         function buildStatusButtons() {
             const row = document.getElementById('status-row');
             if (!Array.isArray(statusData)) {
-                console.log('statusData is not an array, skipping rebuild:', statusData);
+                console.warn('statusData is not an array, skipping rebuild:', statusData);
                 return;
             }
             const isValidVariable = v => {
                 const n = Number(v);
                 return n !== 0 && n !== 1 && n >= 10000;
             };
-            const slots = statusData.filter(item => isValidVariable(item.variable)).slice(0, 2);
+            // Keep the original list position, as the server addresses the slots by it (statusLeft/statusRight)
+            const slots = statusData.slice(0, 2)
+                .map((item, idx) => ({ ...item, idx }))
+                .filter(item => isValidVariable(item.variable));
 
             row.innerHTML = '';
             slots.forEach((item, i) => {
@@ -588,22 +617,24 @@
                     divider.className = 'cc-gauge-status-divider';
                     row.appendChild(divider);
                 }
-                if (i === 0) { statusLeft = Boolean(item.value); }
+                if (item.idx === 0) { statusLeft = Boolean(item.value); }
                 else { statusRight = Boolean(item.value); }
 
                 const btn = document.createElement('div');
                 btn.className = 'cc-gauge-status-button';
-                btn.id = i === 0 ? 'button-left' : 'button-right';
+                btn.id = item.idx === 0 ? 'button-left' : 'button-right';
                 btn.title = item.name;
                 btn.dataset.variable = item.variable;
                 btn.style.setProperty('--status-color', item.color);
-                btn.innerHTML =
-                    `<i class="${getIconType(item.icon).classes}"></i>` +
-                    `<span class="cc-gauge-status-label">${item.name}</span>`;
-                btn.addEventListener('click', () => {
-                    const current = i === 0 ? statusLeft : statusRight;
-                    requestAction('status_' + item.variable, !current);
-                });
+                appendIconAndLabel(btn, item, 'cc-gauge-status-label');
+                if (item.control === false) {
+                    btn.classList.add('readonly');
+                } else {
+                    btn.addEventListener('click', () => {
+                        const current = item.idx === 0 ? statusLeft : statusRight;
+                        requestAction('status_' + item.variable, !current);
+                    });
+                }
                 row.appendChild(btn);
             });
         }
@@ -612,7 +643,7 @@
         function buildModeButtons() {
             const row = document.getElementById('mode-row');
             if (!Array.isArray(modeData)) {
-                console.log('modeData is not an array, skipping rebuild:', modeData);
+                console.warn('modeData is not an array, skipping rebuild:', modeData);
                 return;
             }
             row.innerHTML = '';
@@ -622,11 +653,9 @@
                 btn.title = item.name;
                 btn.dataset.value = String(item.value);
                 btn.dataset.color = item.color;
-                btn.innerHTML =
-                    `<i class="${getIconType(item.icon).classes}"></i>` +
-                    `<span class="cc-mode-label">${item.name}</span>`;
+                appendIconAndLabel(btn, item, 'cc-mode-label');
                 btn.addEventListener('click', () => {
-                    requestAction('mode', item.value);
+                    if (modeControl) requestAction('mode', item.value);
                 });
                 row.appendChild(btn);
             });
@@ -643,6 +672,7 @@
         }
 
         function renderMode() {
+            document.getElementById('mode-row').classList.toggle('readonly', !modeControl);
             document.querySelectorAll('.cc-mode-button').forEach(btn => {
                 const on = btn.dataset.value === String(modeActive);
                 btn.classList.toggle('active', on);
@@ -679,34 +709,41 @@
 
         const dotGroup = document.getElementById('dot-group');
         dotGroup.addEventListener('pointerdown', e => {
+            if (!tempTargetControl) return;
             e.stopPropagation(); dragging = true;
             dotGroup.classList.add('dragging');
             dotGroup.setPointerCapture(e.pointerId);
         });
         dotGroup.addEventListener('pointermove', e => { if (dragging) setTempFromPtr(e); });
         dotGroup.addEventListener('pointerup', () => {
+            if (!dragging) return;
             dragging = false; dotGroup.classList.remove('dragging');
             requestAction('temperature', tempTarget);
         });
         dotGroup.addEventListener('pointercancel', () => { dragging = false; dotGroup.classList.remove('dragging'); });
         document.getElementById('arc-hitzone').addEventListener('click', e => {
-            if (!dragging) { setTempFromPtr(e); requestAction('temperature', tempTarget); }
+            if (!dragging && tempTargetControl) { setTempFromPtr(e); requestAction('temperature', tempTarget); }
         });
 
         // ── GAUGE: buttons (with repeat on hold) ─────────────────────────────
         function changeTemp(delta) {
-            tempTarget = Math.round(Math.max(TEMP_MIN, Math.min(TEMP_MAX, tempTarget + delta)) * 2) / 2;
+            tempTarget = Math.round(Math.max(tempMin, Math.min(tempMax, tempTarget + delta)) * 2) / 2;
             renderGauge();
         }
         function makeRepeat(btnId, delta) {
             const btn = document.getElementById(btnId);
-            let timer = null, interval = null;
+            let timer = null, interval = null, active = false;
             function stop() {
+                // pointerleave also fires without a preceding pointerdown (mouse hover)
+                if (!active) return;
+                active = false;
                 clearTimeout(timer); clearInterval(interval);
                 requestAction('temperature', tempTarget);
             }
             btn.addEventListener('pointerdown', e => {
                 e.preventDefault();
+                if (!tempTargetControl || tempTarget === null) return;
+                active = true;
                 changeTemp(delta);
                 timer = setTimeout(() => { interval = setInterval(() => changeTemp(delta), 80); }, 400);
             });
@@ -725,16 +762,27 @@
             let needsMode = false;
 
             for (const parameter in decodedData) {
-                console.log('Parameter:', parameter, 'Wert:', decodedData[parameter]);
                 switch (parameter) {
                     case 'colorCold':
                         colorCold = decodedData[parameter]; root.style.setProperty('--color-cold', colorCold); needsGauge = true; break;
                     case 'colorWarm':
                         colorWarm = decodedData[parameter]; root.style.setProperty('--color-warm', colorWarm); needsGauge = true; break;
+                    case 'tempMin': {
+                        const v = parseFloat(decodedData[parameter]);
+                        if (!isNaN(v)) { tempMin = v; needsGauge = true; }
+                        break;
+                    }
+                    case 'tempMax': {
+                        const v = parseFloat(decodedData[parameter]);
+                        if (!isNaN(v)) { tempMax = v; needsGauge = true; }
+                        break;
+                    }
                     case 'tempTarget':
                         tempTarget = (decodedData[parameter] === '' || decodedData[parameter] === null || decodedData[parameter] === undefined)
                             ? null : parseFloat(decodedData[parameter]);
                         needsGauge = true; break;
+                    case 'tempTargetControl':
+                        tempTargetControl = Boolean(decodedData[parameter]); needsGauge = true; break;
                     case 'tempActual':
                         tempActual = (decodedData[parameter] === '' || decodedData[parameter] === null || decodedData[parameter] === undefined)
                             ? null : parseFloat(decodedData[parameter]);
@@ -757,12 +805,14 @@
                         statusData = decodedData[parameter]; buildStatusButtons(); needsStatus = true; break;
                     case 'modeLabels':
                         modeLabels = Boolean(decodedData[parameter]); needsMode = true; break;
+                    case 'modeControl':
+                        modeControl = Boolean(decodedData[parameter]); needsMode = true; break;
                     case 'modeActive':
                         modeActive = decodedData[parameter]; needsMode = true; break;
                     case 'modeData':
                         modeData = decodedData[parameter]; buildModeButtons(); needsMode = true; break;
                     default:
-                        console.log('Unbekannter Parameter:', parameter);
+                        console.warn('Unknown parameter:', parameter);
                 }
             }
             if (needsGauge) renderGauge();

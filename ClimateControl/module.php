@@ -8,7 +8,7 @@ require_once __DIR__ . '/../libs/_traits.php';
 /** Namespaced traits */
 use Wilkware\ClimateControl\DebugHelper;
 use Wilkware\ClimateControl\FormatHelper;
-use Wilkware\ClimateControl\VariableHelper;
+use Wilkware\ClimateControl\FormHelper;
 use Wilkware\ClimateControl\VersionHelper;
 
 /**
@@ -22,7 +22,7 @@ class ClimateControl extends IPSModuleStrict
 
     use DebugHelper;
     use FormatHelper;
-    use VariableHelper;
+    use FormHelper;
     use VersionHelper;
 
     // -------------------------------------------------------------------------
@@ -43,6 +43,15 @@ class ClimateControl extends IPSModuleStrict
 
     /** @var int Default color for status indicators (RGB integer) */
     private const COLOR_STATUS = 0xFFC107;
+
+    /** @var float Default minimum of the temperature scale */
+    private const TEMP_MIN = 4.5;
+
+    /** @var float Default maximum of the temperature scale */
+    private const TEMP_MAX = 30.5;
+
+    /** @var int Status code for an invalid temperature range */
+    private const STATUS_INVALID_RANGE = 201;
 
     /** @var string Indicator for status actions */
     private const ACTION_STATUS = 'status';
@@ -67,7 +76,7 @@ class ClimateControl extends IPSModuleStrict
     // -------------------------------------------------------------------------
 
     /**
-     * In contrast to Construct, this function is called only once when creating the instance and starting IP-Symcon.
+     * In contrast to Construct, this function is called only once when creating the instance and starting Symcon.
      * Therefore, status variables and module properties which the module requires permanently should be created here.
      *
      * @return void
@@ -80,6 +89,8 @@ class ClimateControl extends IPSModuleStrict
         // Climate data
         $this->RegisterPropertyInteger('tempActual', 1);
         $this->RegisterPropertyInteger('tempTarget', 1);
+        $this->RegisterPropertyFloat('tempMin', self::TEMP_MIN);
+        $this->RegisterPropertyFloat('tempMax', self::TEMP_MAX);
         $this->RegisterPropertyInteger('valveLevel', 1);
         $this->RegisterPropertyInteger('relativeHumidity', 1);
         $this->RegisterPropertyString('statusData', '[]');
@@ -97,17 +108,9 @@ class ClimateControl extends IPSModuleStrict
 
         // Set visualization type to 1, as we want to offer HTML
         $this->SetVisualizationType(1);
-    }
 
-    /**
-     * This function is called when deleting the instance during operation and when updating via "Module Control".
-     * The function is not called when exiting IP-Symcon.
-     *
-     * @return void
-     */
-    public function Destroy(): void
-    {
-        parent::Destroy();
+        // Wait for the kernel before accessing foreign variables
+        $this->RegisterMessage(0, IPS_KERNELSTARTED);
     }
 
     /**
@@ -126,9 +129,12 @@ class ClimateControl extends IPSModuleStrict
         $ins = IPS_GetInstance($this->InstanceID);
         $mod = IPS_GetModule($ins['ModuleInfo']['ModuleID']);
         $lib = IPS_GetLibrary($mod['LibraryID']);
-        $form['actions'][1]['items'][2]['caption'] = sprintf('v%s.%d', $lib['Version'], $lib['Build']);
+        $version = sprintf('v%s.%d', $lib['Version'], $lib['Build']);
+        $this->ModifyFormElement($form['actions'], 'Version', function (array &$element) use ($version): void
+        {
+            $element['caption'] = $version;
+        });
 
-        //$this->LogDebug(__FUNCTION__, $form);
         return json_encode($form);
     }
 
@@ -140,6 +146,11 @@ class ClimateControl extends IPSModuleStrict
     public function ApplyChanges(): void
     {
         parent::ApplyChanges();
+
+        // Foreign variables may not be available yet, ApplyChanges is called again on IPS_KERNELSTARTED
+        if (IPS_GetKernelRunlevel() !== KR_READY) {
+            return;
+        }
 
         //Delete all references in order to readd them
         foreach ($this->GetReferenceList() as $referenceID) {
@@ -181,6 +192,10 @@ class ClimateControl extends IPSModuleStrict
         $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
 
         // Set status
+        if ($this->ReadPropertyFloat('tempMin') >= $this->ReadPropertyFloat('tempMax')) {
+            $this->SetStatus(self::STATUS_INVALID_RANGE);
+            return;
+        }
         $this->SetStatus(102);
     }
 
@@ -202,16 +217,21 @@ class ClimateControl extends IPSModuleStrict
      */
     public function MessageSink(int $timestamp, int $sender, int $message, array $data): void
     {
-        // check if state really changed ?
-        if ($data[1] != true) {
+        if ($message === IPS_KERNELSTARTED) {
+            $this->ApplyChanges();
             return;
         }
 
         if ($message === VM_UPDATE) {
             $found = false;
-            $this->SendDebug(__FUNCTION__, "Update of $sender = $data[0]", 0);
             foreach (self::REG_VARIABLES as $property) {
                 if ($this->ReadPropertyInteger($property) === $sender) {
+                    // The tile sets the target temperature optimistically, so unchanged
+                    // updates are passed on as well to resync a rejected change
+                    if (!$data[1] && $property !== 'tempTarget') {
+                        return;
+                    }
+                    $this->SendDebug(__FUNCTION__, "Update of $sender = " . $this->Stringify($data[0]), 0);
                     $value = $data[0];
 
                     // Boolean valve drive: treat as a 0%/100% edge case of the
@@ -227,7 +247,8 @@ class ClimateControl extends IPSModuleStrict
                     break;
                 }
             }
-            if (!$found) {
+            if (!$found && $data[1]) {
+                $this->SendDebug(__FUNCTION__, "Update of $sender = " . $this->Stringify($data[0]), 0);
                 $statusData = json_decode($this->ReadPropertyString('statusData'), true) ?? [];
                 $side = 0;
                 foreach ($statusData as $item) {
@@ -254,7 +275,7 @@ class ClimateControl extends IPSModuleStrict
     public function RequestAction(string $ident, mixed $value): void
     {
         // Debug output
-        $this->SendDebug(__FUNCTION__, $ident . ' => ' . $value, 0);
+        $this->SendDebug(__FUNCTION__, $ident . ' => ' . $this->Stringify($value), 0);
 
         switch ($ident) {
             case 'OnAnalyzeVariable':
@@ -277,10 +298,6 @@ class ClimateControl extends IPSModuleStrict
                     $this->LogDebug(__FUNCTION__, 'There was no reaction to the action.');
                 }
         }
-
-        // Send a complete update message to the display, as parameters may have changed
-        // $this->UpdateVisualizationValue($this->GetFullUpdateMessage());
-        return;
     }
 
     /**
@@ -296,7 +313,7 @@ class ClimateControl extends IPSModuleStrict
         $handling = '<script>handleMessage(' . json_encode($this->GetFullUpdateMessage()) . ');</script>';
         // Add static HTML from file
         $module = file_get_contents(__DIR__ . '/module.html');
-        // Important: $initialHandling at the end, as the handleMessage function is only defined in the HTML
+        // Important: $handling at the end, as the handleMessage function is only defined in the HTML
         return $module . $handling;
     }
 
@@ -368,7 +385,7 @@ class ClimateControl extends IPSModuleStrict
         // last line has the selected index
         $variable = $list[$last - 1];
 
-        if ($variable <= self::IPS_MIN_ID || !IPS_VariableExists($variable)) {
+        if ($variable < self::IPS_MIN_ID || !IPS_VariableExists($variable)) {
             $this->EchoMessage($this->Translate('Please select a variable first.'));
             return;
         }
@@ -422,8 +439,7 @@ class ClimateControl extends IPSModuleStrict
     private function ExtractOptionsFromPresentation(int $id): ?array
     {
         $variable = IPS_GetVariable($id);
-        $presentation = $variable['VariablePresentation'] ?? [];
-        $presentation = $variable['VariablePresentation'] ?: $variable['VariableCustomPresentation'];
+        $presentation = $variable['VariableCustomPresentation'] ?: $variable['VariablePresentation'];
 
         if (empty($presentation)) {
             return null;
@@ -526,13 +542,11 @@ class ClimateControl extends IPSModuleStrict
     {
         $variable = $this->ReadPropertyInteger('tempTarget');
         if (IPS_VariableExists($variable)) {
-            if (HasAction($variable)) {
-                RequestAction($variable, $value);
-            } else {
-                $ret = @SetValue($variable, $value);
-                if ($ret === false) {
-                    $this->LogDebug(__FUNCTION__, "Failed to set value for variable $variable");
-                }
+            if (!$this->SwitchVariable($variable, $value)) {
+                // Reset the optimistically changed tile to the current target temperature
+                $this->UpdateVisualizationValue(json_encode([
+                    'tempTarget' => GetValue($variable),
+                ]));
             }
             $this->ForwardToScript(self::ACTION_TEMP, $variable, $value);
         }
@@ -549,14 +563,7 @@ class ClimateControl extends IPSModuleStrict
     {
         $variable = $this->ReadPropertyInteger('modeActive');
         if (IPS_VariableExists($variable)) {
-            if (HasAction($variable)) {
-                RequestAction($variable, $value);
-            } else {
-                $ret = @SetValue($variable, $value);
-                if ($ret === false) {
-                    $this->LogDebug(__FUNCTION__, "Failed to set value for variable $variable");
-                }
-            }
+            $this->SwitchVariable($variable, $value);
             $this->ForwardToScript(self::ACTION_MODE, $variable, $value);
         }
     }
@@ -572,22 +579,57 @@ class ClimateControl extends IPSModuleStrict
     private function UpdateStatus(int $variable, bool $value): void
     {
         $statusData = json_decode($this->ReadPropertyString('statusData'), true) ?? [];
-        foreach ($statusData as &$item) {
-            if ($item['variable'] ?? 1 === $variable) {
+        foreach ($statusData as $item) {
+            if (($item['variable'] ?? 1) === $variable) {
                 if (IPS_VariableExists($variable)) {
-                    if (HasAction($variable)) {
-                        RequestAction($variable, $value);
-                    } else {
-                        $ret = @SetValue($variable, $value);
-                        if ($ret === false) {
-                            $this->LogDebug(__FUNCTION__, "Failed to set value for variable $variable");
-                        }
-                    }
+                    $this->SwitchVariable($variable, $value);
                     $this->ForwardToScript(self::ACTION_STATUS, $variable, $value);
                 }
                 break;
             }
         }
+    }
+
+    /**
+     * Switch a linked variable via its action.
+     *
+     * Variables without an action are never written directly, as a plain value change
+     * would not reach the device. Such requests can only be handled by the action script.
+     *
+     * @param int   $variable Variable ID
+     * @param mixed $value    New value
+     *
+     * @return bool True if the action succeeded or the action script takes over, otherwise false
+     */
+    private function SwitchVariable(int $variable, mixed $value): bool
+    {
+        if (HasAction($variable)) {
+            $ret = @RequestAction($variable, $value);
+            if ($ret === false) {
+                $this->LogMessage("Failed to switch variable $variable to " . $this->Stringify($value), KL_WARNING);
+            }
+            return $ret !== false;
+        }
+        if (IPS_ScriptExists($this->ReadPropertyInteger('scriptAction'))) {
+            return true;
+        }
+        $this->LogDebug(__FUNCTION__, "Variable $variable has no action and no action script is set");
+        return false;
+    }
+
+    /**
+     * Check whether a linked variable can be controlled from the tile.
+     *
+     * @param int $variable Variable ID
+     *
+     * @return bool True if the variable has an action or an action script is set
+     */
+    private function IsControllable(int $variable): bool
+    {
+        if ($variable < self::IPS_MIN_ID || !IPS_VariableExists($variable)) {
+            return false;
+        }
+        return HasAction($variable) || IPS_ScriptExists($this->ReadPropertyInteger('scriptAction'));
     }
 
     /**
@@ -629,28 +671,40 @@ class ClimateControl extends IPSModuleStrict
             } else {
                 $item['value'] = false;
             }
+            $item['control'] = $this->IsControllable($item['variable'] ?? 1);
         }
+        unset($item);
 
         $modeData = json_decode($this->ReadPropertyString('modeData'), true) ?? [];
         foreach ($modeData as &$item) {
             $item['color'] = $this->GetColorFormatted($item['color'] ?? self::COLOR_MODE);
-            $this->LogDebug(__FUNCTION__, 'Mode item: ' . print_r($item, true));
         }
+        unset($item);
 
         $result = [];
         $result['colorCold'] = $this->GetColorFormatted($this->ReadPropertyInteger('colorCold'));
         $result['colorWarm'] = $this->GetColorFormatted($this->ReadPropertyInteger('colorWarm'));
+        $tempMin = $this->ReadPropertyFloat('tempMin');
+        $tempMax = $this->ReadPropertyFloat('tempMax');
+        if ($tempMin >= $tempMax) {
+            $tempMin = self::TEMP_MIN;
+            $tempMax = self::TEMP_MAX;
+        }
+        $result['tempMin'] = $tempMin;
+        $result['tempMax'] = $tempMax;
         $result['tempActual'] = $this->GetValueOrNull('tempActual');
         $result['tempTarget'] = $this->GetValueOrNull('tempTarget');
+        $result['tempTargetControl'] = $this->IsControllable($this->ReadPropertyInteger('tempTarget'));
         $result['valveLevel'] = $this->ResolveValveLevel($this->ReadPropertyInteger('valveLevel'));
         $result['relativeHumidity'] = $this->GetValueOrNull('relativeHumidity');
         $result['statusData'] = $statusData;
         $result['modeActive'] = $this->GetValueOrNull('modeActive');
+        $result['modeControl'] = $this->IsControllable($this->ReadPropertyInteger('modeActive'));
         $result['modeData'] = $modeData;
         $result['statusLabels'] = $this->ReadPropertyBoolean('statusLabels');
         $result['modeLabels'] = $this->ReadPropertyBoolean('modeLabels');
 
-        $this->LogDebug(__FUNCTION__, print_r($result, true));
+        $this->LogDebug(__FUNCTION__, $result);
 
         // send it
         return json_encode($result);

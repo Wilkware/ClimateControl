@@ -56,9 +56,34 @@
                     "type": "RowLayout",
                     "items": [
                         {
+                            "type": "NumberSpinner",
+                            "name": "tempMin",
+                            "caption": "Minimum Temperature:",
+                            "minimum": -50,
+                            "maximum": 100,
+                            "digits": 1,
+                            "suffix": "°C",
+                            "width": "375px"
+                        },
+                        {
+                            "type": "NumberSpinner",
+                            "name": "tempMax",
+                            "caption": "Maximum Temperature:",
+                            "minimum": -50,
+                            "maximum": 100,
+                            "digits": 1,
+                            "suffix": "°C",
+                            "width": "375px"
+                        }
+                    ]
+                },
+                {
+                    "type": "RowLayout",
+                    "items": [
+                        {
                             "type": "SelectVariable",
                             "name": "valveLevel",
-                            "caption": "Valve Level:",
+                            "caption": "Valve Level (optional):",
                             "validVariableTypes": [
                                 0,
                                 1,
@@ -131,13 +156,13 @@
                     "values": [
                         {
                             "variable": 1,
-                            "name": "Fenster",
+                            "name": "Window",
                             "icon": "window-frame-open",
                             "color": 5989870
                         },
                         {
                             "variable": 1,
-                            "name": "Prognose",
+                            "name": "Forecast",
                             "icon": "sun",
                             "color": 15250506
                         }
@@ -234,6 +259,11 @@
                             }
                         }
                     ]
+                },
+                {
+                    "type": "Label",
+                    "caption": "Note: Target temperature, mode and status can only be operated from the tile if the linked variable has an action or an action script is set (see advanced settings). Otherwise they are display-only.",
+                    "italic": true
                 }
             ]
         },
@@ -331,9 +361,32 @@
                 },
                 {
                     "type": "Label",
+                    "name": "Version",
                     "color": 8421504
                 }
             ]
+        }
+    ],
+    "status": [
+        {
+            "code": 101,
+            "icon": "inactive",
+            "caption": "Creating instance."
+        },
+        {
+            "code": 102,
+            "icon": "active",
+            "caption": "Instance active."
+        },
+        {
+            "code": 104,
+            "icon": "inactive",
+            "caption": "Instance inactive."
+        },
+        {
+            "code": 201,
+            "icon": "error",
+            "caption": "Minimum temperature must be lower than maximum temperature."
         }
     ]
 }
