@@ -378,7 +378,7 @@ class ClimateControl extends IPSModuleStrict
     /**
      * Get value range (min, max) of a variable from its presentation or profile
      *
-     * @param array $variable Variable info (IPS_GetVariable)
+     * @param array<string, mixed> $variable Variable info (IPS_GetVariable)
      *
      * @return array{0: float, 1: float} Range, [0, 100] if none is defined
      */
