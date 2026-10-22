@@ -234,10 +234,9 @@ class ClimateControl extends IPSModuleStrict
                     $this->SendDebug(__FUNCTION__, "Update of $sender = " . $this->Stringify($data[0]), 0);
                     $value = $data[0];
 
-                    // Boolean valve drive: treat as a 0%/100% edge case of the
-                    // standard 0–100% scale rather than as true/false
-                    if ($property === 'valveLevel' && is_bool($value)) {
-                        $value = $value ? 100.0 : 0.0;
+                    // Normalize valve level to 0–100% (boolean drives, 0..1 scales, ...)
+                    if ($property === 'valveLevel') {
+                        $value = $this->ResolveValveLevel($sender);
                     }
 
                     $this->UpdateVisualizationValue(json_encode([
@@ -345,7 +344,10 @@ class ClimateControl extends IPSModuleStrict
     }
 
     /**
-     * Resolve valve level
+     * Resolve valve level as percentage (0–100)
+     *
+     * Values are scaled by the range of the variable's presentation or profile,
+     * e.g. Homematic drives deliver 0.0–1.0 (~Intensity.1).
      *
      * @param int $id Variable ID
      *
@@ -365,7 +367,35 @@ class ClimateControl extends IPSModuleStrict
             return $value ? 100.0 : 0.0;
         }
 
-        return (float) $value;
+        [$min, $max] = $this->GetVariableRange($variable);
+        if ($max > $min && ($min !== 0.0 || $max !== 100.0)) {
+            $value = ((float) $value - $min) / ($max - $min) * 100.0;
+        }
+
+        return max(0.0, min(100.0, (float) $value));
+    }
+
+    /**
+     * Get value range (min, max) of a variable from its presentation or profile
+     *
+     * @param array $variable Variable info (IPS_GetVariable)
+     *
+     * @return array{0: float, 1: float} Range, [0, 100] if none is defined
+     */
+    private function GetVariableRange(array $variable): array
+    {
+        $presentation = IPS_GetVariablePresentation($variable['VariableID']);
+        if (isset($presentation['MIN'], $presentation['MAX'])) {
+            return [(float) $presentation['MIN'], (float) $presentation['MAX']];
+        }
+
+        $profile = $variable['VariableCustomProfile'] ?: $variable['VariableProfile'];
+        if ($profile !== '' && IPS_VariableProfileExists($profile)) {
+            $info = IPS_GetVariableProfile($profile);
+            return [(float) $info['MinValue'], (float) $info['MaxValue']];
+        }
+
+        return [0.0, 100.0];
     }
 
     /**

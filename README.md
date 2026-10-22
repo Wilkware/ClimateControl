@@ -61,7 +61,7 @@ Ist-Temperatur             | Variable, die die aktuelle (Ist-)Temperatur liefert
 Soll-Temperatur            | Variable, die die Ziel-(Soll-)Temperatur liefert bzw. per Gauge gesetzt wird.
 Minimale Temperatur        | Untere Grenze der Temperaturskala bzw. der einstellbaren Soll-Temperatur (Standard: 4,5 °C), passend zur eigenen Hardware.
 Maximale Temperatur        | Obere Grenze der Temperaturskala bzw. der einstellbaren Soll-Temperatur (Standard: 30,5 °C). Muss größer als die minimale Temperatur sein, sonst geht die Instanz in den Fehlerzustand.
-Ventilstellung (optional)  | Optionale Variable für die Position des Heizventils. Bleibt das Feld leer, wird der Wert in der Visualisierung nicht angezeigt.
+Ventilstellung (optional)  | Optionale Variable für die Position des Heizventils. Der Wert wird anhand des Bereichs (Min/Max) der Darstellung bzw. des Profils in 0–100 % umgerechnet (z. B. Homematic 0.0–1.0), boolsche Variablen ergeben 0 % bzw. 100 %. Bleibt das Feld leer, wird der Wert in der Visualisierung nicht angezeigt.
 Luftfeuchte (optional)     | Optionale Variable für die (relative) Luftfeuchte. Bleibt das Feld leer, wird der Wert in der Visualisierung nicht angezeigt.
 Status-Icon links / rechts | Liste mit genau zwei Einträgen für die Status-Icons links/rechts in der Gauge (z. B. Fenster, Prognose). Pro Eintrag: Variable, Name, Icon und Farbe. Bleibt die Variable eines Eintrags leer, wird das entsprechende Icon ausgeblendet.
 Aktiver Modus               | Variable, die den aktuell aktiven Modus liefert (Wert muss zu einem der Einträge in der Modus-Liste passen).
